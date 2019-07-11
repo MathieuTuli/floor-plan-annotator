@@ -143,6 +143,9 @@ class AutomaticAnnotator:
             plt.tight_layout()
             plt.show()
 
+    def confirm(self,):
+        pass
+
 
 if __name__ == "__main__":
     model_path = importlib.resources.path(
@@ -154,11 +157,12 @@ if __name__ == "__main__":
     #     'test.txt')
     # image_path = str(next(image_list_path.gen))
     # print(image_path)
-    dataset = FloorplanSVG('data/cubicasa5k/', 'test.txt',
+    dataset = FloorplanSVG('data/sydney-house/', 'predict.txt',
                            format='txt', original_size='True')
     data_loader = DataLoader(dataset, batch_size=1, num_workers=0)
     data_iter = iter(data_loader)
     for item in data_iter:
+        item = next(data_iter)
         image = item['image'].cuda()
         _, _, h, w = image.shape
         annotator.annotate_image(image, h, w)
