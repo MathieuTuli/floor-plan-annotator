@@ -6,15 +6,10 @@
 '''
 from pathlib import Path
 from typing import Tuple, List, Any
+import importlib.resourcse
 
-from floortrans.post_prosessing import split_prediction, get_polygons, \
-    split_validation
-from mpl_toolkits.axes_grid1 import AxesGrid
-from floortrans.plotting import segmentation_plot, polygons_to_image, \
-    draw_junction_from_dict, discrete_cmap
-from floortrans.loaders import FloorplanSVG, DictToTensor, Compose, \
-    RotateNTurns
-from floortrans.models import get_model
+
+# from mpl_toolkits.axes_grid1 import AxesGrid
 from torch.utils.data import DataLoader
 from skimage import transform
 
@@ -25,6 +20,14 @@ import numpy as np
 import torch
 import cv2
 
+from .CubiCasa5k.floortrans.post_prosessing import split_prediction, \
+    get_polygons, split_validation
+from .CubiCasa5k.floortrans.plotting import segmentation_plot, \
+    polygons_to_image, draw_junction_from_dict, discrete_cmap
+from .CubiCasa5k.floortrans.loaders import FloorplanSVG, DictToTensor, \
+    Compose, RotateNTurns
+from .CubiCasa5k.floortrans.models import get_model
+
 
 class AutomaticAnnotator:
     def __init__(self, checkpoint_path: Path):
@@ -33,8 +36,8 @@ class AutomaticAnnotator:
         self.n_rooms = len(self.room_classes)
         self.n_icons = len(self.icon_classes)
 
-    def load_model(self, model_path: str) -> Tuple(Any, List, List,
-                                                   int, List, Any):
+    def load_model(self, model_path: str) -> Tuple[Any, List, List,
+                                                   int, List, Any]:
         discrete_cmap()
         rot = RotateNTurns()
         room_classes = ["Background", "Outdoor", "Wall", "Kitchen",
@@ -145,5 +148,11 @@ class AutomaticAnnotator:
 
 
 if __name__ == "__main__":
-    annotator = AutomaticAnnotator('cubicasa_model.pkl')
-    annotator.annotate_image('test.png')
+    model_path = importlib.resources.path(
+        'floor_plan_annotator',
+        'cubicasa_model.pkl')
+    annotator = AutomaticAnnotator(str(next(model_path.gen)))
+    image_path = importlib.resources.path(
+        'floor_plan_annotator',
+        'test.png')
+    annotator.annotate_image(str(next(image_path.gen)))
