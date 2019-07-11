@@ -6,7 +6,8 @@
 '''
 from pathlib import Path
 from typing import Tuple, List, Any
-import importlib.resourcse
+import importlib.resources
+import sys
 
 
 # from mpl_toolkits.axes_grid1 import AxesGrid
@@ -36,7 +37,7 @@ class AutomaticAnnotator:
         self.n_rooms = len(self.room_classes)
         self.n_icons = len(self.icon_classes)
 
-    def load_model(self, model_path: str) -> Tuple[Any, List, List,
+    def load_model(self, model_path: str) -> Tuple[List, List,
                                                    int, List, Any]:
         discrete_cmap()
         rot = RotateNTurns()
@@ -59,16 +60,9 @@ class AutomaticAnnotator:
         model.cuda()
         return (rot, room_classes, icon_classes, n_classes, split, model)
 
-    def annotate_image(self, image_path: str):
+    def annotate_image(self, image: Any, height: int, width: int):
+        img_size = (height, width)
         with torch.no_grad():
-            img = cv2.imread(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            height, width, _ = img.shape
-            img_size = (height, width)
-            img = np.moveaxis(img, -1, 0)
-            img = torch.tensor(img.astype(np.float32))
-            img = img.cuda()
-
             rotations = [(0, 0), (1, -1), (2, 2), (-1, 1)]
             pred_count = len(rotations)
             prediction = torch.zeros(
@@ -76,7 +70,7 @@ class AutomaticAnnotator:
             for i, r in enumerate(rotations):
                 forward, back = r
                 # We rotate first the image
-                rot_image = self.rot(img, 'tensor', forward)
+                rot_image = self.rot(image, 'tensor', forward)
                 pred = self.model(rot_image)
                 # We rotate prediction back
                 pred = self.rot(pred, 'tensor', back)
@@ -97,6 +91,7 @@ class AutomaticAnnotator:
             icons_pred = F.softmax(prediction[0, 21+12:], 0).cpu().data.numpy()
             icons_pred = np.argmax(icons_pred, axis=0)
 
+            print("Doing rooms")
             plt.figure(figsize=(12, 12))
             ax = plt.subplot(1, 1, 1)
             ax.axis('off')
@@ -107,6 +102,7 @@ class AutomaticAnnotator:
             cbar.ax.set_yticklabels(self.room_classes, fontsize=20)
             plt.show()
 
+            print("Doing icons")
             plt.figure(figsize=(12, 12))
             ax = plt.subplot(1, 1, 1)
             ax.axis('off')
@@ -117,6 +113,7 @@ class AutomaticAnnotator:
             cbar.ax.set_yticklabels(self.icon_classes, fontsize=20)
             plt.show()
 
+            print("Doing post")
             heatmaps, rooms, icons = split_prediction(prediction, img_size,
                                                       self.split)
             polygons, types, room_polygons, room_types = get_polygons(
@@ -149,10 +146,19 @@ class AutomaticAnnotator:
 
 if __name__ == "__main__":
     model_path = importlib.resources.path(
-        'floor_plan_annotator',
+        'floor_plan_annotator.models',
         'cubicasa_model.pkl')
     annotator = AutomaticAnnotator(str(next(model_path.gen)))
-    image_path = importlib.resources.path(
-        'floor_plan_annotator',
-        'test.png')
-    annotator.annotate_image(str(next(image_path.gen)))
+    # image_list_path = importlib.resources.path(
+    #     'floor_plan_annotator.data',
+    #     'test.txt')
+    # image_path = str(next(image_list_path.gen))
+    # print(image_path)
+    dataset = FloorplanSVG('data/cubicasa5k/', 'test.txt',
+                           format='txt', original_size='True')
+    data_loader = DataLoader(dataset, batch_size=1, num_workers=0)
+    data_iter = iter(data_loader)
+    for item in data_iter:
+        image = item['image'].cuda()
+        _, _, h, w = image.shape
+        annotator.annotate_image(image, h, w)
