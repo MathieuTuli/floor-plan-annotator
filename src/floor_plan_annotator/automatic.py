@@ -4,6 +4,7 @@
 * date: 2019-07-11
 * author: MathieuTuli
 '''
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import Tuple, List, Any
 import importlib.resources
@@ -28,6 +29,11 @@ from .CubiCasa5k.floortrans.plotting import segmentation_plot, \
 from .CubiCasa5k.floortrans.loaders import FloorplanSVG, DictToTensor, \
     Compose, RotateNTurns
 from .CubiCasa5k.floortrans.models import get_model
+
+parser = ArgumentParser('')
+parser.add_argument('--cubi', action='store_true')
+parser.set_defaults(cubi=False)
+args = parser.parse_args()
 
 
 class AutomaticAnnotator:
@@ -147,22 +153,48 @@ class AutomaticAnnotator:
         pass
 
 
+def annotate_from_colors(houses_folder: Path):
+    np.set_printoptions(threshold=sys.maxsize)
+    colours = {
+        # 'red': [0, 0, 255],
+        'yellow': [0, 255, 255],
+        # 'blue': [255, 0, 0],
+        # 'green': [0, 255, 0]
+    }
+    for house_folder in houses_folder.iterdir():
+        for house in house_folder.iterdir():
+            if 'floorplan_label' in str(house) and house.suffix == '.png':
+                print(house)
+                img = cv2.imread(str(house))
+                # B G R
+                for colour_name, colour in colours.items():
+                    mask = np.array(colour)
+                    mask = cv2.inRange(img, mask, mask)
+                    cv2.imshow(colour_name, mask)
+                    print(cv2.findNonZero(mask))
+                cv2.waitKey(0)
+                sys.exit(0)
+
+
 if __name__ == "__main__":
-    model_path = importlib.resources.path(
-        'floor_plan_annotator.models',
-        'cubicasa_model.pkl')
-    annotator = AutomaticAnnotator(str(next(model_path.gen)))
-    # image_list_path = importlib.resources.path(
-    #     'floor_plan_annotator.data',
-    #     'test.txt')
-    # image_path = str(next(image_list_path.gen))
-    # print(image_path)
-    dataset = FloorplanSVG('data/sydney-house/', 'predict.txt',
-                           format='txt', original_size='True')
-    data_loader = DataLoader(dataset, batch_size=1, num_workers=0)
-    data_iter = iter(data_loader)
-    for item in data_iter:
-        item = next(data_iter)
-        image = item['image'].cuda()
-        _, _, h, w = image.shape
-        annotator.annotate_image(image, h, w)
+    if args.cubi:
+        model_path = importlib.resources.path(
+            'floor_plan_annotator.models',
+            'cubicasa_model.pkl')
+        annotator = AutomaticAnnotator(str(next(model_path.gen)))
+        # image_list_path = importlib.resources.path(
+        #     'floor_plan_annotator.data',
+        #     'test.txt')
+        # image_path = str(next(image_list_path.gen))
+        # print(image_path)
+        dataset = FloorplanSVG('data/sydney-house/', 'predict.txt',
+                               format='txt', original_size='True')
+        data_loader = DataLoader(dataset, batch_size=1, num_workers=0)
+        data_iter = iter(data_loader)
+        for item in data_iter:
+            item = next(data_iter)
+            image = item['image'].cuda()
+            _, _, h, w = image.shape
+            annotator.annotate_image(image, h, w)
+    else:
+        annotate_from_colors(Path('sydney-house/rent_crawler/goodhouses'))

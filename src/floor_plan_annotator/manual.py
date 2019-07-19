@@ -13,5 +13,9 @@ class ManualAnnotator:
         '''
         pass
 
-    def open_image(self, path: Path):
-        pass
+    def run(self,):
+        houses_folder = 'sydney-house/rent_crawler/goodhouses'
+        for house_folder in houses_folder.iterdir():
+            for house in house_folder.iterdir():
+                if 'floorplan_label' in str(house) and house.suffix == '.png':
+                    print(house)
