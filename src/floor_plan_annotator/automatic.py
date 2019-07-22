@@ -153,25 +153,109 @@ class AutomaticAnnotator:
         pass
 
 
+def normalize_to_origin(nodes,
+                        img) -> Tuple[List[Tuple[int, int]], np.ndarray]:
+    pass
+
+
+def get_list_of_non_zero(mask) -> List[Tuple[int, int]]:
+    nodes = cv2.findNonZero(mask)
+    nodes = [(int(node[0][0]), int(node[0][1]))
+             for node in nodes]
+    return nodes
+
+
+def conform_nodes(nodes: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+    threshold = 9
+    other_x = 0
+    other_y = 0
+
+
+def yellow_corners(
+        img: np.ndarray) -> Tuple[np.ndarray, List[Tuple[int, int]]]:
+    yellow = [0, 255, 255]
+    mask = np.array(yellow)
+    mask = cv2.inRange(img, mask, mask)
+    for i, row in enumerate(mask):
+        for j, col in enumerate(row):
+            if col == 255:
+                try:
+                    # first left coord, block out the others
+                    range_ = [-3, -2, -1, 1, 0,
+                              1, 3, 4, 5, 6, 7, 8, 9]
+                    for x in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                        for y in range_:
+                            mask[i + x][j + y] = 0
+                    mask[i][j] = 255
+                except Exception:
+                    pass
+    nodes = get_list_of_non_zero(mask)
+    print(nodes)
+    nodes = conform_nodes(nodes)
+    print(nodes)
+    return mask, nodes
+
+
+def green_windows(
+        img: np.ndarray,
+        corners: List[Tuple[int, int]]) -> Tuple[np.ndarray,
+                                                 List[Tuple[int, int]]]:
+    green = [0, 255, 0]
+    mask = np.array(green)
+    mask = cv2.inRange(img, mask, mask)
+    nodes = get_list_of_non_zero(mask)
+    for i, row in enumerate(mask):
+        for j, col in enumerate(row):
+            pass
+    nodes = get_list_of_non_zero(mask)
+    return mask, nodes
+
+
+def blue_doors(
+        img: np.ndarray,
+        corners: List[Tuple[int, int]]) -> Tuple[np.ndarray,
+                                                 List[Tuple[int, int]]]:
+    blue = [255, 0, 0]
+    mask = np.array(blue)
+    mask = cv2.inRange(img, mask, mask)
+    for i, row in enumerate(mask):
+        pass
+    nodes = get_list_of_non_zero(mask)
+    return mask, nodes
+
+
+def red_walls(
+        img: np.ndarray,
+        corners: List[Tuple[int, int]]) -> Tuple[np.ndarray,
+                                                 List[Tuple[int, int]]]:
+    red = [0, 0, 255]
+    mask = np.array(red)
+    mask = cv2.inRange(img, mask, mask)
+    for i, row in enumerate(mask):
+        pass
+    nodes = get_list_of_non_zero(mask)
+    return mask, nodes
+
+
 def annotate_from_colors(houses_folder: Path):
     np.set_printoptions(threshold=sys.maxsize)
-    colours = {
-        # 'red': [0, 0, 255],
-        'yellow': [0, 255, 255],
-        # 'blue': [255, 0, 0],
-        # 'green': [0, 255, 0]
-    }
+    # ORDER MATTERS | Y THEN B THEN G
     for house_folder in houses_folder.iterdir():
         for house in house_folder.iterdir():
             if 'floorplan_label' in str(house) and house.suffix == '.png':
                 print(house)
                 img = cv2.imread(str(house))
                 # B G R
-                for colour_name, colour in colours.items():
-                    mask = np.array(colour)
-                    mask = cv2.inRange(img, mask, mask)
-                    cv2.imshow(colour_name, mask)
-                    print(cv2.findNonZero(mask))
+                # Check out this janky shit
+                # now i need to align these janky corners
+                yellow_mask, corners = yellow_corners(img)
+                blue_mask, windows = green_windows(img, corners)
+                green_mask, doors = blue_doors(img, corners)
+                red_mask, walls = red_walls(img, corners)
+                cv2.imshow('yellow', yellow_mask)
+                cv2.imshow('green', green_mask)
+                cv2.imshow('blue', blue_mask)
+                cv2.imshow('red', red_mask)
                 cv2.waitKey(0)
                 sys.exit(0)
 
