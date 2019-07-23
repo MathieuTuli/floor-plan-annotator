@@ -1,29 +1,34 @@
-''' Manual Annotation tool
-'''
-
+# TODO: Make Frame class that has frame: np.ndarray and annotions: List[str] as
+# @ members that can handle all the drawing on its own
 from pathlib import Path
-from typing import List, Tuple
-
-import sys
+from typing import Tuple, List
 
 import numpy as np
 import cv2
+import sys
+
+from python_shape_grammars.floor_plan_elements import Node, Edge, RoomNode
 
 from .components import CornerAnnotation, WindowAnnotation, \
     DoorAnnotation, EdgeAnnotation, GraphAnnotations
 
-CLICK_BARRIER = False
 REF_PTS = list()
+PREV_EDGE_NODE = None
+CLICK_BARRIER = False
 
 
 class ManualAnnotator:
-    def __init__(self, floor_plans: List[Path], save_to: Path):
-        '''
-        '''
+    def __init__(self,
+                 floor_plans: List[Path],
+                 save_to: Path,):
         self.floor_plans = floor_plans
         self.save_to: Path = save_to
         self.build_directories()
         self.current_graph: GraphAnnotations = None
+        self.corners = list()
+        self.windows = list()
+        self.doors = list()
+        self.walls = list()
 
     @staticmethod
     def record_click(event, x, y, flags, param):
@@ -47,107 +52,168 @@ class ManualAnnotator:
             if not new_folder.is_dir():
                 new_folder.mkdir(parents=True)
 
-    def write(self, annotation: GraphAnnotations) -> bool:
-        raise NotImplementedError
+    def write_results(self, results: GraphAnnotations) -> None:
+        image_path = self.image_bank / f"{self.frame_counter}.jpg"
+        annotation_path = self.annotation_file_bank / \
+            f"{self.frame_counter}.txt"
+        cv2.imwrite(str(image_path), results.frame)
+        with open(annotation_path, "w") as f:
+            image_width = results.image_width
+            image_height = results.image_height
+            f.write("{class_name},{left},{top},{right}," +
+                    "{bottom},{image_width},{image_height}\n")
+            for obj in results.objects:
+                f.write(f"{obj.class_name},{obj.bbox.left},{obj.bbox.top}" +
+                        f",{obj.bbox.right},{obj.bbox.bottom},{image_width}," +
+                        f"{image_height}\n")
+        self.frame_counter += 1
 
-    def draw_point(self, point: Tuple[int, int],
+    def run(self,) -> None:
+        for floor_plan in self.floor_plans:
+            frame = cv2.imread(str(floor_plan))
+            frame_copy = frame.copy()
+            while True:
+                cv2.destroyAllWindows()
+                cv2.namedWindow("image")
+                cv2.moveWindow("image", 20, 20)
+                cv2.imshow("image", frame_copy)
+                print('What would you like to draw?\n' +
+                      '[c] corner | [w] window | [d] door | [e] edge' +
+                      '| [p] disregard image\n' +
+                      'Press [q] to quit fully\n' +
+                      'Press [n] to move on')
+                key = cv2.waitKey(0)
+                key = key & 0xFF
+                if key == ord('c') or key == ord('w') \
+                        or key == ord('d') or key == ord('e'):
+                    frame, results = self.annotate(frame_copy, key)
+                elif key & 0xFF == ord('q'):
+                    print("Are you sure you want to quit [y]/[n]")
+                    while True:
+                        q = cv2.waitKey(0)
+                        if q & 0xFF == ord('y'):
+                            sys.exit(0)
+                        elif q & 0xFF == ord('n'):
+                            break
+                elif key & 0xFF == ord('n'):
+                    print("Are you sure you want to move on")
+                    _continue = False
+                    while True:
+                        q = cv2.waitKey(0)
+                        if q & 0xFF == ord('y'):
+                            _continue = True
+                            break
+                        elif q & 0xFF == ord('n'):
+                            break
+                    if _continue:
+                        break
+
+    def draw_point(self, image: np.ndarray, point: Tuple[int, int],
                    colour: Tuple[int, int, int],
-                   image: np.ndarray) -> np.ndarray:
-        cv2.circle(image, point, colour)
+                   ) -> np.ndarray:
+        cv2.circle(image, center=point, radius=1, color=colour)
         return image
 
-    def draw_line(self, point_a: Tuple[int, int], point_b: Tuple[int, int],
-                  colour: Tuple[int, int, int],
-                  image: np.ndarray) -> np.ndarray:
-        return image
+    def add_corner(self, points: List[Tuple[int, int]]):
+        cur_x, cur_y = points[0]
+        if len(self.corners) == 0:
+            self.corners.append((cur_x, cur_y))
+            return
+        prev_x, prev_y = self.corners[-1]
+        if abs(cur_x - prev_x) < abs(cur_y - prev_y):
+            self.corners.append((prev_x, cur_y))
+        else:
+            self.corners.append((cur_x, prev_y))
 
-    def get_key(self, message: str) -> str:
-        '''returns 0 for not confirmed, 1 for confirmed, -1 for quit
-        '''
-        print(message)
-        print("Press [q] to quit.")
-        key = cv2.waitKey(0)
-        return key & 0xFF
+    def add_window(self, points: List[Tuple[int, int]]):
+        pass
 
-    def wait_for_click(self):
-        print('Waiting for a click')
-        global CLICK_BARRIER
-        while not CLICK_BARRIER:
-            continue
+    def add_door(self, points: List[Tuple[int, int]]):
+        pass
 
-    def add_corner(self, img: np.ndarray) -> CornerAnnotation:
-        img_copy = img.copy()
-        self.wait_for_click()
+    def add_wall(self, points: List[Tuple[int, int]]):
+        pass
+
+    def annotate(self, frame: np.ndarray,
+                 _type: str) -> Tuple[np.ndarray, str]:
+        cv2.destroyAllWindows()
+        cv2.namedWindow("clickable_image")
+        cv2.moveWindow("clickable_image", 20, 20)
+        cv2.setMouseCallback("clickable_image",
+                             ManualAnnotator.record_click)
+        old_frame = frame.copy()
+        if _type == ord('c'):
+            print("CORNER")
+        elif _type == ord('w'):
+            print("WINDOW")
+        elif _type == ord('d'):
+            print("DOOR")
+        elif _type == ord('e'):
+            print("WALL")
+        print("Press [q] at any time to quit this new drawing session")
         while True:
             global REF_PTS
             if len(REF_PTS) == 2:
-                self.draw_point(img_copy, REF_PTS[0], (0, 255, 255))
-
-    def add_window(self, img: np.ndarray) -> WindowAnnotation:
-        img_copy = img.copy()
-        global REF_PTS
-        self.wait_for_click()
-        if len(REF_PTS) == 2:
-            self.draw_point(img_copy, REF_PTS[0], (0, 255, 0))
-
-    def add_door(self, img: np.ndarray) -> DoorAnnotation:
-        img_copy = img.copy()
-        global REF_PTS
-        self.wait_for_click()
-        if len(REF_PTS) == 2:
-            self.draw_point(img_copy, REF_PTS[0], (255, 0, 0))
-
-    def add_edge(self, img: np.ndarray) -> EdgeAnnotation:
-        img_copy = img.copy()
-        global REF_PTS
-        raise NotImplementedError
-
-    def run(self,):
-        for floor_plan in self.floor_plans:
-            img = cv2.imread(str(floor_plan))
-            if img is None:
-                print(f"\n\n{floor_plan} could not be read.\n\n")
-                continue
-            # self.write(annotation)
-            # if len(REF_PTS) == 2:
-            #     cv2.rectangle(img, REF_PTS[0], REF_PTS[1])
-            img_copy = img.copy()
-            while True:
-                global REF_PTS
-                REF_PTS = list()
-                cv2.destroyAllWindows()
-                cv2.namedWindow("current_floor_plan")
-                cv2.moveWindow("current_floor_plan", 20, 20)
-                cv2.setMouseCallback("current_floor_plan",
-                                     ManualAnnotator.record_click)
-                cv2.imshow("current_floor_plan", img)
-                key = self.get_key(
-                    'What would you like to draw?\n' +
-                    '[c] corner | [w] window | [d] door | [e] edge' +
-                    '| [p] disregard image')
-                if key == ord('c'):
-                    # self.add_corner(img)
-                    while True:
-                        if len(REF_PTS) == 2:
-                            print("YES")
-                            REF_PTS = list()
-                elif key == ord('w'):
-                    self.add_window(img)
-                elif key == ord('d'):
-                    self.add_door(img)
-                elif key == ord('e'):
-                    self.add_edge(img)
-                elif key == ord('p'):
-                    pass
-                elif key == ord('q'):
-                    sys.exit(0)
+                if _type == ord('c'):
+                    cv2.circle(frame, REF_PTS[0], radius=4, color=(0, 0, 255))
+                elif _type == ord('w'):
+                    cv2.circle(frame, REF_PTS[0], radius=4, color=(0, 0, 255))
+                elif _type == ord('d'):
+                    cv2.circle(frame, REF_PTS[0], radius=4, color=(0, 0, 255))
+                elif _type == ord('e'):
+                    cv2.circle(frame, REF_PTS[0], radius=4, color=(0, 0, 255))
+                cv2.imshow('clickable_image', frame)
+                print("Press [y] to confirm, else press any other key.")
+                print("Press [q] to cancel this operation")
+                key = cv2.waitKey(0)
+                if key & 0xFF == ord('y'):
+                    print("You press [y], creating new annotation")
+                    old_frame = frame
+                    if _type == ord('c'):
+                        self.add_corner(REF_PTS)
+                    elif _type == ord('w'):
+                        self.add_window(REF_PTS)
+                    elif _type == ord('d'):
+                        self.add_door(REF_PTS)
+                    elif _type == ord('e'):
+                        self.add_wall(REF_PTS)
+                elif key & 0xFF == ord('q'):
+                    print("Quitting new session")
+                    return frame, None
                 else:
-                    print("unknown selection")
-                    continue
-                break
+                    frame = old_frame.copy()
+                REF_PTS = list()
+            else:
+                cv2.imshow('clickable_image', frame)
+                key = cv2.waitKey(1)
+                if key & 0xFF == ord('q'):
+                    print("Quitting session")
+                    return frame, None
+
+        # This would happen if you click right and drag left to draw
+        # drawn rt to lb
+        # if REF_PTS[0][0] > REF_PTS[1][0] and REF_PTS[0][1] < REF_PTS[1][1]:
+        #     rt = REF_PTS[0]
+        #     lb = REF_PTS[1]
+        #     REF_PTS[0] = (lb[0], rt[1])
+        #     REF_PTS[1] = (rt[0], lb[1])
+        # # drawn rb to lt
+        # elif REF_PTS[0][0] > REF_PTS[1][0] and REF_PTS[0][1] > REF_PTS[1][1]:
+        #     temp = REF_PTS[0]
+        #     REF_PTS[0] = REF_PTS[1]
+        #     REF_PTS[1] = temp
+        # # drawn lb to rt
+        # elif REF_PTS[0][0] < REF_PTS[1][0] and REF_PTS[0][1] > REF_PTS[1][1]:
+        #     lb = REF_PTS[0]
+        #     rt = REF_PTS[1]
+        #     REF_PTS[0] = (lb[0], rt[1])
+        #     REF_PTS[1] = (rt[0], lb[1])
+        REF_PTS = list()
+        cv2.destroyAllWindows()
+        return frame, None  # result
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     houses_folder = Path('sydney-house/rent_crawler/goodhouses')
     houses = list()
     for house_folder in houses_folder.iterdir():

@@ -1,3 +1,6 @@
 [submodule "src/floor_plan_annotator/CubiCasa5k"]
 	path = src/floor_plan_annotator/CubiCasa5k
 	url = https://github.com/CubiCasa/CubiCasa5k.git
+[submodule "src/floor_plan_annotator/python-shape-grammars"]
+	path = src/floor_plan_annotator/python-shape-grammars
+	url = https://github.com/mathieutuli/python-shape-grammars
