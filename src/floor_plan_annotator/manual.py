@@ -7,7 +7,13 @@ import numpy as np
 import cv2
 import sys
 
-from python_shape_grammars.floor_plan_elements import Node, Edge, RoomNode
+from python_shape_grammars.floor_plan_elements import Node, Edge, RoomNode, \
+    CornerNode, WallNode, Rectangle, Window, Door, Staircase
+from python_shape_grammars.components import EdgeType, EdgeDirection, \
+    RoomType, FloorPlanStatus
+from python_shape_grammars.floor_plan import FloorPlan
+from python_shape_grammars.vector import Vector
+from python_shape_grammars.line import Line
 
 from .components import CornerAnnotation, WindowAnnotation, \
     DoorAnnotation, EdgeAnnotation, GraphAnnotations
