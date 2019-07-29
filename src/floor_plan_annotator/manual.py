@@ -27,14 +27,9 @@ class ManualAnnotator:
     def __init__(self,
                  floor_plans: List[Path],
                  save_to: Path,):
-        self.floor_plans = floor_plans
+        self.current_floor_plan: FloorPlan = None
         self.save_to: Path = save_to
         self.build_directories()
-        self.current_graph: GraphAnnotations = None
-        self.corners = list()
-        self.windows = list()
-        self.doors = list()
-        self.walls = list()
 
     @staticmethod
     def record_click(event, x, y, flags, param):
@@ -78,6 +73,8 @@ class ManualAnnotator:
         for floor_plan in self.floor_plans:
             frame = cv2.imread(str(floor_plan))
             frame_copy = frame.copy()
+            self.current_floor_plan = FloorPlan(
+                str(floor_plan), status=FloorPlanStatus.start)
             while True:
                 cv2.destroyAllWindows()
                 cv2.namedWindow("image")
@@ -122,9 +119,7 @@ class ManualAnnotator:
 
     def add_corner(self, points: List[Tuple[int, int]]):
         cur_x, cur_y = points[0]
-        if len(self.corners) == 0:
-            self.corners.append((cur_x, cur_y))
-            return
+        node = Node(Vector(cur_x, cur_y))
         prev_x, prev_y = self.corners[-1]
         if abs(cur_x - prev_x) < abs(cur_y - prev_y):
             self.corners.append((prev_x, cur_y))
