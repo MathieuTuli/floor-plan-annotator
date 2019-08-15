@@ -27,6 +27,7 @@ class ManualAnnotator:
     def __init__(self,
                  floor_plans: List[Path],
                  save_to: Path,):
+        self.floor_plans = floor_plans
         self.current_floor_plan: FloorPlan = None
         self.save_to: Path = save_to
         self.build_directories()

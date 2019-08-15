@@ -234,7 +234,7 @@ if __name__ == "__main__":
     houses = list()
     for house_folder in houses_folder.iterdir():
         for house in house_folder.iterdir():
-            if 'floorplan_label' in str(house) and house.suffix == '.png':
+            if 'floorplan.png' in str(house) and house.suffix == '.png':
                 houses.append(house)
 
     annotator = ManualAnnotator(houses, Path('processed_houses/floor-plans'))

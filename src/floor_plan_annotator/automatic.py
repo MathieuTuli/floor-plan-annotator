@@ -63,7 +63,7 @@ class AutomaticAnnotator:
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['model_state'])
         model.eval()
-        model.cuda()
+        # model.cuda()
         return (rot, room_classes, icon_classes, n_classes, split, model)
 
     def annotate_image(self, image: Any, height: int, width: int):
@@ -277,7 +277,8 @@ if __name__ == "__main__":
         data_iter = iter(data_loader)
         for item in data_iter:
             item = next(data_iter)
-            image = item['image'].cuda()
+            image = item['image']
+            # image = item['image'].cuda()
             _, _, h, w = image.shape
             annotator.annotate_image(image, h, w)
     else:
